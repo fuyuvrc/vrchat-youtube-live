@@ -24,7 +24,7 @@ async function handleLiveList(env, request) {
   const page = parseInt(url.searchParams.get("page") || "1", 10);
 
   const PER_PAGE = 8;
-  const MAX_ITEMS = 24;
+  const MAX_ITEMS = 40; // 24
 
   const cache = caches.default;
   const cacheKey = new Request("https://cache/youtube-live-list");
