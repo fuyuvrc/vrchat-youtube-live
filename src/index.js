@@ -30,6 +30,9 @@ async function handleLiveList(env, request) {
   const cache = caches.default;
   const cacheKey = new Request("https://cache/youtube-live-list");
 
+  // ★テスト用：ここでキャッシュを削除して常に最新データ取得
+  await cache.delete(cacheKey);
+
   let allLives;
 
   const cached = await cache.match(cacheKey);
