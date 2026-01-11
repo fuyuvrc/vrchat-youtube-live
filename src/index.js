@@ -2,6 +2,17 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    // プリフライト対応
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "*"
+        }
+      });
+    }
+
     if (url.pathname === "/lives") {
       return handleLiveList(env, request);
     }
@@ -11,7 +22,10 @@ export default {
       return handleVideoInfo(env, videoId);
     }
 
-    return new Response("Not Found", { status: 404 });
+    return new Response("Not Found", {
+      status: 404,
+      headers: { "Access-Control-Allow-Origin": "*" }
+    });
   }
 };
 
@@ -32,14 +46,12 @@ async function handleLiveList(env, request) {
 
   let allLives;
 
-  // キャッシュ確認
   const cached = await cache.match(cacheKey);
   if (cached) {
     allLives = await cached.json();
   } else {
     const apiKey = env.YOUTUBE_API_KEY;
 
-    // YouTubeライブ検索
     const searchUrl =
       "https://www.googleapis.com/youtube/v3/search" +
       "?part=snippet" +
@@ -63,7 +75,6 @@ async function handleLiveList(env, request) {
       startTime: item.snippet.publishedAt
     })).slice(0, MAX_ITEMS);
 
-    // チャンネルアイコンを取得（キャッシュ活用）
     const channelMap = await getChannelIcons(env, lives.map(v => v.channelId));
 
     allLives = lives.map(v => ({
@@ -71,19 +82,18 @@ async function handleLiveList(env, request) {
       channelIcon: channelMap[v.channelId] || null
     }));
 
-    // ライブリストキャッシュ 30分
     await cache.put(
       cacheKey,
       new Response(JSON.stringify(allLives), {
         headers: {
           "Content-Type": "application/json",
-          "Cache-Control": "max-age=1800"
+          "Cache-Control": "max-age=1800",
+          "Access-Control-Allow-Origin": "*"
         }
       })
     );
   }
 
-  // ページ分割
   const start = (page - 1) * PER_PAGE;
   const items = allLives.slice(start, start + PER_PAGE);
 
@@ -95,7 +105,12 @@ async function handleLiveList(env, request) {
       totalPages: Math.ceil(allLives.length / PER_PAGE),
       items
     }),
-    { headers: { "Content-Type": "application/json" } }
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
+    }
   );
 }
 
@@ -105,14 +120,12 @@ async function getChannelIcons(env, channelIds) {
   const cache = caches.default;
   const CHANNEL_CACHE_KEY = new Request("https://cache/youtube-channels");
 
-  // キャッシュ取得
   let channelMap = {};
   const cached = await cache.match(CHANNEL_CACHE_KEY);
   if (cached) {
     channelMap = await cached.json();
   }
 
-  // キャッシュにないチャンネルだけ取得
   const missingIds = channelIds.filter(id => !channelMap[id]);
   if (missingIds.length > 0) {
     const apiKey = env.YOUTUBE_API_KEY;
@@ -121,16 +134,16 @@ async function getChannelIcons(env, channelIds) {
     );
     const data = await res.json();
     (data.items || []).forEach(ch => {
-      channelMap[ch.id] = ch.snippet.thumbnails.default.url; // 小アイコン使用
+      channelMap[ch.id] = ch.snippet.thumbnails.default.url;
     });
 
-    // チャンネルキャッシュ更新（12時間）
     await cache.put(
       CHANNEL_CACHE_KEY,
       new Response(JSON.stringify(channelMap), {
         headers: {
           "Content-Type": "application/json",
-          "Cache-Control": "max-age=43200"
+          "Cache-Control": "max-age=43200",
+          "Access-Control-Allow-Origin": "*"
         }
       })
     );
@@ -142,7 +155,7 @@ async function getChannelIcons(env, channelIds) {
 // ===============================
 // 動画情報
 async function handleVideoInfo(env, videoId) {
-  if (!videoId) return new Response("videoId required", { status: 400 });
+  if (!videoId) return new Response("videoId required", { status: 400, headers: { "Access-Control-Allow-Origin": "*" } });
 
   const apiKey = env.YOUTUBE_API_KEY;
 
@@ -154,11 +167,10 @@ async function handleVideoInfo(env, videoId) {
   );
 
   const data = await res.json();
-  if (!data.items?.length) return new Response(null, { status: 404 });
+  if (!data.items?.length) return new Response(null, { status: 404, headers: { "Access-Control-Allow-Origin": "*" } });
 
   const v = data.items[0];
 
-  // チャンネルアイコン取得（キャッシュ利用）
   const channelMap = await getChannelIcons(env, [v.snippet.channelId]);
   const channelIcon = channelMap[v.snippet.channelId] || null;
 
@@ -171,6 +183,9 @@ async function handleVideoInfo(env, videoId) {
     isLive: !!v.liveStreamingDetails?.activeLiveChatId,
     startTime: v.liveStreamingDetails?.actualStartTime || null
   }), {
-    headers: { "Content-Type": "application/json" }
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*"
+    }
   });
 }
