@@ -13,14 +13,13 @@ export default {
       return handleVideoInfo(env, videoId);
     }
 
-    return new Response("Not Found", { status: 404, headers: { "Access-Control-Allow-Origin": "*" } });
+    return new Response("Not Found", { status: 404 });
   }
 };
 
 // ===============================
 // 配信中ライブリスト
 async function handleLiveList(env, request) {
-
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "1", 10);
 
@@ -32,10 +31,12 @@ async function handleLiveList(env, request) {
 
   let allLives;
 
+  // ① キャッシュ確認
   const cached = await cache.match(cacheKey);
   if (cached) {
     allLives = await cached.json();
   } else {
+    // ② YouTube API を1回だけ呼ぶ
     const apiKey = env.YOUTUBE_API_KEY;
 
     const searchUrl =
@@ -44,56 +45,37 @@ async function handleLiveList(env, request) {
       "&eventType=live" +
       "&type=video" +
       "&regionCode=JP" +
-      "&maxResults=50" +
+      "&maxResults=50" +    
       "&q=ゲーム OR Game OR VTuber OR にじさんじ OR Nijisanji OR ホロライブ OR Hololive OR 雑談 OR ライブ OR Live OR 配信 OR Streaming  OR ニュース OR News OR 天気" +
       "&key=" + apiKey;
 
     const res = await fetch(searchUrl);
     const data = await res.json();
 
-    allLives = await Promise.all(
-      (data.items || [])
-        .map(async item => {
-          const videoId = item.id.videoId;
-          const channelId = item.snippet.channelId;
+    allLives = (data.items || [])
+      .map(item => ({
+        videoId: item.id.videoId,
+        url: "https://www.youtube.com/watch?v=" + item.id.videoId,
+        title: item.snippet.title,
+        channelName: item.snippet.channelTitle,
+        thumbnail: item.snippet.thumbnails.medium.url,
+        startTime: item.snippet.publishedAt
+      }))
+      .slice(0, MAX_ITEMS); // ← 24件に制限
 
-          // チャンネルアイコン取得
-          let channelIcon = "";
-          try {
-            const channelRes = await fetch(
-              `https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${channelId}&key=${apiKey}`
-            );
-            const channelData = await channelRes.json();
-            channelIcon = channelData.items?.[0]?.snippet?.thumbnails?.default?.url || "";
-          } catch (e) {
-            console.error("Channel icon fetch failed:", e);
-          }
-
-          return {
-            videoId,
-            url: "https://www.youtube.com/watch?v=" + videoId,
-            title: item.snippet.title,
-            channelName: item.snippet.channelTitle,
-            channelIcon, // ← 追加
-            thumbnail: item.snippet.thumbnails.medium.url,
-            startTime: item.snippet.publishedAt
-          };
-        })
-        .slice(0, MAX_ITEMS)
-    );
-
+    // ③ 30分キャッシュ
     await cache.put(
       cacheKey,
       new Response(JSON.stringify(allLives), {
         headers: {
           "Content-Type": "application/json",
-          "Cache-Control": "max-age=1800",
-          "Access-Control-Allow-Origin": "*"
+          "Cache-Control": "max-age=1800" // 30分
         }
       })
     );
   }
 
+  // ④ ページ分割
   const start = (page - 1) * PER_PAGE;
   const items = allLives.slice(start, start + PER_PAGE);
 
@@ -107,17 +89,17 @@ async function handleLiveList(env, request) {
     }),
     {
       headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*"
+        "Content-Type": "application/json"
       }
     }
   );
 }
 
+
 // ===============================
 // 動画情報
 async function handleVideoInfo(env, videoId) {
-  if (!videoId) return new Response("videoId required", { status: 400, headers: { "Access-Control-Allow-Origin": "*" } });
+  if (!videoId) return new Response("videoId required", { status: 400 });
 
   const apiKey = env.YOUTUBE_API_KEY;
 
@@ -129,7 +111,7 @@ async function handleVideoInfo(env, videoId) {
   );
 
   const data = await res.json();
-  if (!data.items?.length) return new Response(null, { status: 404, headers: { "Access-Control-Allow-Origin": "*" } });
+  if (!data.items?.length) return new Response(null, { status: 404 });
 
   const v = data.items[0];
 
@@ -141,9 +123,7 @@ async function handleVideoInfo(env, videoId) {
     isLive: !!v.liveStreamingDetails?.activeLiveChatId,
     startTime: v.liveStreamingDetails?.actualStartTime || null
   }), {
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*"
-    }
+    headers: { "Content-Type": "application/json" }
   });
 }
+
