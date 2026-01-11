@@ -60,7 +60,8 @@ async function handleLiveList(env, request) {
       "&regionCode=JP" +
       "&relevanceLanguage=ja" +
       "&maxResults=50" +
-      "&q=ゲーム OR Game OR VTuber OR にじさんじ OR Nijisanji OR ホロライブ OR Hololive OR 雑談 OR ライブ OR Live OR 配信 OR Streaming OR ニュース OR News OR 天気" +
+      // "&order=viewCount" +
+      "&q=ゲーム OR VTuber OR にじさんじ OR Nijisanji OR ホロライブ OR Hololive OR 雑談 OR ライブ OR 配信 OR ニュース" +
       "&key=" + apiKey;
 
     const res = await fetch(searchUrl);
