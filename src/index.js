@@ -20,8 +20,6 @@ export default {
 // ===============================
 // 配信中ライブリスト
 async function handleLiveList(env, request) {
-  // テスト用：キャッシュをクリア
-  await cache.delete(cacheKey);
 
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "1", 10);
