@@ -42,7 +42,7 @@ async function handleLiveList(env, request) {
   const cacheKey = new Request("https://cache/youtube-live-list");
 
   // テスト用：キャッシュをクリア
-  await cache.delete(cacheKey);
+  // await cache.delete(cacheKey);
 
   let allLives;
 
@@ -58,6 +58,7 @@ async function handleLiveList(env, request) {
       "&eventType=live" +
       "&type=video" +
       "&regionCode=JP" +
+      "&relevanceLanguage=ja" +
       "&maxResults=50" +
       "&q=ゲーム OR Game OR VTuber OR にじさんじ OR Nijisanji OR ホロライブ OR Hololive OR 雑談 OR ライブ OR Live OR 配信 OR Streaming OR ニュース OR News OR 天気" +
       "&key=" + apiKey;
